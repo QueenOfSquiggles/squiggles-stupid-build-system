@@ -7,6 +7,8 @@
 
 using namespace std;
 
+vector<string> tokenize(string input);
+
 bool StupidBuild::load_config(string filepath)
 {
 
@@ -45,7 +47,6 @@ bool StupidBuild::load_config(string filepath)
 
 void StupidBuild::parse_configs()
 {
-	// TODO: parse more complex configurations into the class's values
 	if (auto s = this->config.find("std"); s != this->config.end())
 	{
 		this->standard = s->second;
@@ -53,6 +54,45 @@ void StupidBuild::parse_configs()
 	if (auto s = this->config.find("extra"); s != this->config.end())
 	{
 		this->extra_args = s->second;
+	}
+	if (auto s = this->config.find("warnings"); s != this->config.end())
+	{
+		auto tokens = tokenize(s->second);
+		for (string t : tokens)
+		{
+			if (t[0] == '[' || t[0] == ']')
+			{
+				continue;
+			}
+			this->warnings.push_back(t);
+		}
+	}
+	if (auto s = this->config.find("libs"); s != this->config.end())
+	{
+		auto tokens = tokenize(s->second);
+		for (string t : tokens)
+		{
+			if (t[0] == '[' || t[0] == ']')
+			{
+				continue;
+			}
+			Library lib;
+			lib.name = t;
+			lib.link = LinkMode::STATIC;
+			this->libraries.push_back(lib);
+		}
+	}
+	if (auto s = this->config.find("include"); s != this->config.end())
+	{
+		auto tokens = tokenize(s->second);
+		for (string t : tokens)
+		{
+			if (t[0] == '[' || t[0] == ']')
+			{
+				continue;
+			}
+			this->include_dirs.push_back(t);
+		}
 	}
 }
 
@@ -163,12 +203,86 @@ vector<string> tokenize(string input)
 	return tokens;
 }
 
+void handle_error_line(BuildResponse *response, string file)
+{
+	// read file
+	ifstream reader(file);
+	if (!reader.is_open())
+	{
+		return;
+	}
+	string line;
+	int log_file_line = 0;
+	while (getline(reader, line))
+	{
+		log_file_line++;
+		if (line.substr(0, 4).compare("src/") != 0 || line.find(":") == -1)
+		{
+			continue;
+		}
+		// source file
+		int idx = line.find(":");
+		string source = line.substr(0, idx);
+		line = line.substr(idx + 1);
+		// line number
+		idx = line.find(':');
+		if (idx > 8 || idx == -1)
+		{
+			continue;
+		}
+		// cout << "Error from " << file << ":" << log_file_line << endl;
+		// cout << "Line: <<" << line << ">>" << endl;
+		// cout << "File: " << source << endl;
+		// cout << "Line Number: '" << line.substr(0, idx) << "'" << endl;
+		int line_num = stoi(line.substr(0, idx));
+		line = line.substr(idx + 1);
+
+		// column number
+		idx = line.find(":");
+		// cout << "Line Column: '" << line.substr(0, idx) << "'" << endl;
+		int column = stoi(line.substr(0, idx));
+		line = line.substr(idx + 1);
+
+		// message type
+		idx = line.find(":");
+		string msg_type = line.substr(1, idx - 1); // remove space
+		// cout << "Type: '" << msg_type << "'" << endl;
+		line = line.substr(idx + 1);
+
+		// message
+		LineError err;
+		err.file = source;
+		err.line = line_num;
+		err.message = line;
+		// cout << "Message: '" << line << "'" << endl
+		//  << endl;
+
+		if (msg_type.compare("error") == 0)
+		{
+			response->errors.push_back(err);
+		}
+		else if (msg_type.compare("note") == 0)
+		{
+			continue;
+		}
+		else
+		{
+			response->warnings.push_back(err);
+		}
+	}
+}
+
 BuildResponse StupidBuild::build_target(string target)
 {
+	// make build dirs
+	filesystem::create_directories("./build/temp");
+	system("rm ./build/**/*.log.txt &> /dev/null");
+
 	if (target.compare(DEFAULT_TARGET_CONFIG) != 0)
 	{
 		this->load_config(target);
 	}
+	this->parse_configs();
 	BuildResponse resp;
 	string bin = this->config["binary"];
 	// construct arguments chain
@@ -180,6 +294,10 @@ BuildResponse StupidBuild::build_target(string target)
 	for (string warning : this->warnings)
 	{
 		args += " -W" + warning;
+	}
+	for (Library lib : this->libraries)
+	{
+		args += " -l" + lib.name;
 	}
 	if (!this->standard.empty())
 	{
@@ -199,36 +317,39 @@ BuildResponse StupidBuild::build_target(string target)
 		}
 
 		filesystem::path rel_path = filesystem::relative(s.filepath);
-
+		string log_path = filesystem::relative("build/temp/" + rel_path.stem().string() + ".log.txt").string();
 		char cmd[CMD_BUFFER_SIZE];
-		snprintf(cmd, CMD_BUFFER_SIZE, "g++ -c %s %s -o ./build/temp/%s",
+		snprintf(cmd, CMD_BUFFER_SIZE, "g++ -c %s %s -o ./build/temp/%s &> %s",
 				 args.c_str(),
 				 rel_path.generic_string().c_str(),
-				 (rel_path.stem().string() + ".o").c_str());
-		FILE *stream = popen(cmd, "r");
-		char line[CMD_BUFFER_SIZE];
-		while (fgets(line, CMD_BUFFER_SIZE, stream) != NULL)
+				 (rel_path.stem().string() + ".o").c_str(),
+				 (log_path).c_str());
+		int succeeded = system(cmd);
+		if (succeeded != 0)
 		{
-			printf("[%s] (%s) :: %s \n", bin.c_str(), rel_path.filename(), line);
-		}
-
-		if (stream == NULL)
-		{
-			printf("Failed to assemble source file at %s \n", rel_path.generic_string().c_str());
-			continue;
+			handle_error_line(&resp, log_path);
 		}
 	}
 
 	// compile/link binary
 	char cmd[CMD_BUFFER_SIZE];
-	snprintf(cmd, CMD_BUFFER_SIZE, "g++ -o ./build/%s ./build/temp/*.o", bin.c_str());
-	FILE *stream = popen(cmd, "r");
-	char line[CMD_BUFFER_SIZE];
-	while (fgets(line, CMD_BUFFER_SIZE, stream) != NULL)
+	snprintf(cmd, CMD_BUFFER_SIZE, "g++ -o ./build/%s ./build/temp/*.o &> ./build/%s", bin.c_str(), (bin + ".log.txt").c_str());
+	if (system(cmd) != 0)
 	{
-		printf("[%s] (*) :: %s \n", bin.c_str(), line);
+		// cerr << "Failed to compile binary: " << bin << endl
+		// 	 << "\tRead log file for more info: " << bin << ".log.txt" << endl;
 	}
 
+	FILE *stream = popen(cmd, "r");
+	if (stream == NULL)
+	{
+		printf("Failed to assemble binary");
+	}
+	char line[CMD_BUFFER_SIZE];
+	while (fgets(line, CMD_BUFFER_SIZE, stream) != NULL)
+	{ // printf("[%s] (*) :: %s \n", bin.c_str(), line);
+	}
+	system("rm ./build/temp/*.o &> /dev/null");
 	resp.succeeded = resp.warnings.size() == 0 && resp.errors.size() == 0;
 	return resp;
 }

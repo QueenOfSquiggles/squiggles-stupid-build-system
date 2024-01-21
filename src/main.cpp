@@ -33,13 +33,15 @@ int main(int argc, char *argv[])
 	for (int i = 0; i < resp.errors.size(); i++)
 	{
 		LineError err = resp.errors[i];
-		printf("Error %s : %d \n\t %s", err.file, err.line, err.message);
+		printf("[Error] %s:%d\n  - \"%s\"\n", err.file.c_str(), err.line, err.message.c_str());
 	}
 	for (int i = 0; i < resp.warnings.size(); i++)
 	{
 		LineError err = resp.warnings[i];
-		printf("Warning %s : %d \n\t %s", err.file, err.line, err.message);
+		printf("[Warning] %s\n  [%d]- %s\n", err.file.c_str(), err.line, err.message.c_str());
 	}
+	std::cerr << std::endl
+			  << "Read more details in the log files under build/" << std::endl;
 
 	return -1;
 }
