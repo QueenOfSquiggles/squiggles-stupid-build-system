@@ -35,13 +35,15 @@ struct LineError
 struct Source
 {
 	fs::path filepath;
+	fs::path obj_path;
+	fs::path log_path;
 	SourceType type;
 	std::vector<LineError> errors;
 	std::vector<LineError> warnings;
 };
 
 enum LinkMode
-{
+{ // TODO implement linking modes
 	STATIC,
 	DYNAMIC
 };

@@ -88,6 +88,11 @@ void Display::display_build_information()
 			cerr << col::yellow << col::bold << "  [" << relative_path.string() << ":" << err.line << ":" << err.column << "] Warning: " << col::reset << col::yellow << msg << endl
 				 << col::reset;
 		}
+		if (!source.errors.empty() || !source.warnings.empty())
+		{
+			cout << endl
+				 << "  See full logs at [" << source.log_path.string() << "]" << endl;
+		}
 		cout << col::bold << "================================" << endl
 			 << col::reset;
 	}
