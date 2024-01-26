@@ -32,9 +32,9 @@ struct LineError
 
 struct Source
 {
-	filesystem::path filepath;
-	filesystem::path obj_path;
-	filesystem::path log_path;
+	std::filesystem::path filepath;
+	std::filesystem::path obj_path;
+	std::filesystem::path log_path;
 	SourceType type;
 	std::vector<LineError> errors;
 	std::vector<LineError> warnings;
