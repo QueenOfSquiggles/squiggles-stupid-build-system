@@ -1,37 +1,37 @@
-name: C/C++ CI
-
-on: 
+name: CI
+on:
   push:
     branches:
       - main
 
 jobs:
-  build:
-    runs-on: ${{ matrix.os }}
+  Windows:
+    name: build-{{ matrix.os }}
+    runs-on: ${{matrix.os }}
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        configs: [Release, Debug]
+        configs: [Release] #, Debug]
+
     steps:
     - name: Checkout
-      uses: actions/checkout@v2.0.0
-    - name: Install conan
+      uses: actions/checkout@v1
+      # with:
+      #     submodules: recursive
+
+    # - name: Installing vcpkg
+    #   run: |
+    #     cd ..
+    #     git clone https://github.com/Microsoft/vcpkg.git
+    #     cd vcpkg
+    #     git checkout --force 2020.01
+    #     .\bootstrap-vcpkg.bat
+    #     .\vcpkg.exe install cppzmq:x64-windows
+
+    - name: Running cmake
       run: |
-        python3 -m pip install --upgrade pip
-        pip3 install conan
-        pip3 install conan --upgrade
-        conan --version
-        conan profile new default --detect
-    - name: Build project
-      uses: nicledomaS/cmake_build_action@v1.4
-      with:
-        config: ${{ matrix.configs }}
-        submodule_update: ON
-        run_tests: ON
-        unit_test_build: -DFIND_TESTS=ON
-        cmake_args: -DFIND_CONAN=ON;-DFIND_MODULES=ON;-DENABLE_TIDY=ON
-        create_package: ON
-    - uses: actions/upload-artifact@v2
-      with:
-        path: build/*.tar.gz
-        name: artifact_${{ matrix.os }}_${{ matrix.configs }}.tar.gz
+        cd ${{ github.workspace }}
+        cmake --build .
+    # - name: Build Solution
+    #   run: |
+        
