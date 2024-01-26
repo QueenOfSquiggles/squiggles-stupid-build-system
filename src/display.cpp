@@ -2,7 +2,7 @@
 #include "display.hpp"
 #include <filesystem>
 // https://termcolor.readthedocs.io/
-#include <termcolor/termcolor.hpp>
+#include <termcolor.hpp>
 
 using namespace std;
 namespace fs = filesystem;
