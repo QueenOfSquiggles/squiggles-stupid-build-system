@@ -173,7 +173,7 @@ vector<Source> StupidBuild::get_files_recursive(string dir)
 	{
 		Source source;
 		source.filepath = f;
-		string ext = f.extension();
+		string ext = f.extension().string();
 
 		if (ext.compare(".cpp") == 0)
 		{
