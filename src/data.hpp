@@ -75,6 +75,7 @@ private:
 	std::string extra_args;
 	std::string standard;
 	std::string current_dir;
+	std::string compiler;
 	bool debug_mode = false;
 	bool optimize = true;
 	bool incremental = true;

@@ -55,6 +55,10 @@ void StupidBuild::parse_configs()
 	{
 		this->extra_args = s->second;
 	}
+	if (auto s = this->config.find("compiler"); s != this->config.end())
+	{
+		this->compiler = s->second;
+	}
 	if (auto s = this->config.find("debug"); s != this->config.end())
 	{
 		this->debug_mode = s->second.compare("true") == 0;
@@ -260,7 +264,7 @@ void StupidBuild::collect_log_data(Source *source,
 		LineError err;
 		err.line = line_num;
 		err.column = column;
-		err.message = line;
+		err.message = line + "\n[ " + log_file.string() + ":" + to_string(log_file_line) + " ]";
 		// cout << "Message: '" << line << "'" << endl
 		//  << endl;
 
@@ -284,6 +288,7 @@ void StupidBuild::collect_log_data(Source *source,
 bool StupidBuild::open_path(string directory)
 {
 	this->current_dir = directory;
+	compiler = "g++";
 	if (!this->load_config(DEFAULT_TARGET_CONFIG))
 	{
 		if (!this->init())
@@ -347,6 +352,8 @@ BuildResponse StupidBuild::build_target(string target)
 	{
 		args += " -I /$(pwd)/" + incl;
 	}
+	// include source dir automatically
+	args += " -I /$(pwd)/src/";
 	for (string dir : this->library_dirs)
 	{
 		args += " -L /$(pwd)/" + dir;
@@ -387,7 +394,7 @@ BuildResponse StupidBuild::build_target(string target)
 		if (!this->incremental || has_source_changed(s))
 		{
 			char cmd[CMD_BUFFER_SIZE];
-			snprintf(cmd, CMD_BUFFER_SIZE, "g++ -c %s %s -o %s &> %s", args.c_str(),
+			snprintf(cmd, CMD_BUFFER_SIZE, "%s -c %s %s -o %s &> %s", compiler.c_str(), args.c_str(),
 					 rel_path.generic_string().c_str(), get_obj_path(s).c_str(),
 					 s.log_path.c_str());
 			system(cmd);
@@ -403,7 +410,7 @@ BuildResponse StupidBuild::build_target(string target)
 	// compile/link binary
 	char cmd[CMD_BUFFER_SIZE];
 	snprintf(cmd, CMD_BUFFER_SIZE,
-			 "g++ -o ./build/%s %s ./build/temp/*.o &> ./build/%s", bin.c_str(),
+			 "%s -o ./build/%s %s ./build/temp/*.o &> ./build/%s", compiler.c_str(), bin.c_str(),
 			 args.c_str(), (bin + ".log.txt").c_str());
 	if (system(cmd) != 0)
 	{
