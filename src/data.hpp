@@ -5,8 +5,6 @@
 #include <unordered_map>
 #include <filesystem>
 
-namespace fs = std::filesystem;
-
 #define DEFAULT_TARGET_CONFIG "ssbs"
 #define CMD_BUFFER_SIZE 4096
 
@@ -34,9 +32,9 @@ struct LineError
 
 struct Source
 {
-	fs::path filepath;
-	fs::path obj_path;
-	fs::path log_path;
+	filesystem::path filepath;
+	filesystem::path obj_path;
+	filesystem::path log_path;
 	SourceType type;
 	std::vector<LineError> errors;
 	std::vector<LineError> warnings;

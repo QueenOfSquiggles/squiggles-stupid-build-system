@@ -5,8 +5,6 @@
 #include <termcolor.hpp>
 
 using namespace std;
-namespace fs = filesystem;
-namespace col = termcolor;
 
 Display::Display(BuildResponse *response)
 {
@@ -70,30 +68,30 @@ void Display::display_build_information()
 		{
 			continue;
 		}
-		fs::path relative_path = fs::relative(source.filepath);
-		cout << col::bold << "================================" << endl
-			 << col::reset;
-		cerr << "In " << col::underline << relative_path.string() << col::reset << " : "
-			 << "(" << col::red << source.errors.size() << col::reset << " errors, " << col::yellow << source.warnings.size() << col::reset << " warnings):" << endl;
+		filesystem::path relative_path = filesystem::relative(source.filepath);
+		cout << termcolor::bold << "================================" << endl
+			 << termcolor::reset;
+		cerr << "In " << termcolor::underline << relative_path.string() << termcolor::reset << " : "
+			 << "(" << termcolor::red << source.errors.size() << termcolor::reset << " errors, " << termcolor::yellow << source.warnings.size() << termcolor::reset << " warnings):" << endl;
 
 		for (LineError err : source.errors)
 		{
 			string msg = split_long_message(err.message);
-			cerr << col::red << col::bold << "  [" << relative_path.string() << ":" << err.line << ":" << err.column << "] Error: " << col::reset << col::red << msg << endl
-				 << col::reset;
+			cerr << termcolor::red << termcolor::bold << "  [" << relative_path.string() << ":" << err.line << ":" << err.column << "] Error: " << termcolor::reset << termcolor::red << msg << endl
+				 << termcolor::reset;
 		}
 		for (LineError err : source.warnings)
 		{
 			string msg = split_long_message(err.message);
-			cerr << col::yellow << col::bold << "  [" << relative_path.string() << ":" << err.line << ":" << err.column << "] Warning: " << col::reset << col::yellow << msg << endl
-				 << col::reset;
+			cerr << termcolor::yellow << termcolor::bold << "  [" << relative_path.string() << ":" << err.line << ":" << err.column << "] Warning: " << termcolor::reset << termcolor::yellow << msg << endl
+				 << termcolor::reset;
 		}
 		if (!source.errors.empty() || !source.warnings.empty())
 		{
 			cout << endl
 				 << "  See full logs at [" << source.log_path.string() << "]" << endl;
 		}
-		cout << col::bold << "================================" << endl
-			 << col::reset;
+		cout << termcolor::bold << "================================" << endl
+			 << termcolor::reset;
 	}
 }
