@@ -199,14 +199,27 @@ vector<Source> StupidBuild::get_files_recursive(string dir)
 		{
 			continue;
 		}
-		filesystem::path obj_path = filesystem::relative("build/temp");
+		auto global_path = f.parent_path().string();
+		auto index = global_path.find(this->config["source"]);
+		auto offset = this->config["source"].length() + 1;
+		string dir = "";
+		if (index + offset < global_path.length())
+		{
+			dir = global_path.substr(index + offset);
+		}
+
+		filesystem::path obj_path = filesystem::relative("build/obj");
+		obj_path.append(dir);
 		obj_path.append(f.stem().string() + ".o");
 		source.obj_path = obj_path;
 
-		filesystem::path log_path = filesystem::relative("build/temp");
+		filesystem::path log_path = filesystem::relative("build/log");
+		log_path.append(dir);
 		log_path.append(f.stem().string() + ".log.txt");
 		source.log_path = log_path;
-
+		// cout << "Source file: " << f << endl
+		// 	 << "\tOBJ: " << obj_path << endl
+		// 	 << "\tLOG: " << log_path << endl;
 		files.push_back(source);
 	}
 	return files;
@@ -316,28 +329,18 @@ vector<string> tokenize(string input)
 	return tokens;
 }
 
-filesystem::path StupidBuild::get_obj_path(Source source)
-{
-	filesystem::path path = filesystem::relative("./build/temp");
-	path.append(source.filepath.stem().string() + ".o");
-	return path;
-}
-
 bool StupidBuild::has_source_changed(Source source)
 {
-	if (!filesystem::exists(this->get_obj_path(source)))
+	if (!filesystem::exists(source.obj_path))
 	{
 		return true;
 	}
 	return filesystem::last_write_time(source.filepath) >
-		   filesystem::last_write_time(this->get_obj_path(source));
+		   filesystem::last_write_time(source.obj_path);
 }
 
 BuildResponse StupidBuild::build_target(string target)
 {
-	// make build dirs
-	filesystem::create_directories("./build/temp");
-
 	if (target.compare(DEFAULT_TARGET_CONFIG) != 0)
 	{
 		this->load_config(target);
@@ -382,7 +385,7 @@ BuildResponse StupidBuild::build_target(string target)
 	{
 		args += this->extra_args;
 	}
-
+	string object_sources = "";
 	// build object files
 	for (Source s : this->source_files)
 	{
@@ -390,12 +393,17 @@ BuildResponse StupidBuild::build_target(string target)
 		{
 			continue;
 		}
+		filesystem::create_directories(s.log_path.parent_path());
+		filesystem::create_directories(s.obj_path.parent_path());
+
 		filesystem::path rel_path = filesystem::relative(s.filepath);
+		object_sources += filesystem::relative(s.obj_path).string() + " ";
+
 		if (!this->incremental || has_source_changed(s))
 		{
 			char cmd[CMD_BUFFER_SIZE];
 			snprintf(cmd, CMD_BUFFER_SIZE, "%s -c %s %s -o %s &> %s", compiler.c_str(), args.c_str(),
-					 rel_path.generic_string().c_str(), get_obj_path(s).c_str(),
+					 rel_path.generic_string().c_str(), s.obj_path.c_str(),
 					 s.log_path.c_str());
 			system(cmd);
 		}
@@ -410,8 +418,8 @@ BuildResponse StupidBuild::build_target(string target)
 	// compile/link binary
 	char cmd[CMD_BUFFER_SIZE];
 	snprintf(cmd, CMD_BUFFER_SIZE,
-			 "%s -o ./build/%s %s ./build/temp/*.o &> ./build/%s", compiler.c_str(), bin.c_str(),
-			 args.c_str(), (bin + ".log.txt").c_str());
+			 "%s -o ./build/%s %s %s &> ./build/%s", compiler.c_str(), bin.c_str(),
+			 args.c_str(), object_sources.c_str(), (bin + ".log.txt").c_str());
 	if (system(cmd) != 0)
 	{
 		cerr << "Failed to link binary. See " << bin_log.string()

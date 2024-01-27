@@ -80,7 +80,6 @@ private:
 	bool optimize = true;
 	bool incremental = true;
 
-	std::filesystem::path get_obj_path(Source source);
 	bool has_source_changed(Source source);
 	bool load_config(std::string filepath);
 	void parse_configs();

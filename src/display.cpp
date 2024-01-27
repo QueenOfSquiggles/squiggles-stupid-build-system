@@ -94,4 +94,16 @@ void Display::display_build_information()
 		cout << termcolor::bold << "================================" << endl
 			 << termcolor::reset;
 	}
+	if (this->response->warnings <= 0)
+		return;
+	if (this->response->succeeded)
+	{
+		printf("Build completed with %d warnings\n", this->response->warnings);
+	}
+	else
+	{
+		printf("Failed to compile with %d errors, %d warnings\n", this->response->errors, this->response->warnings);
+	}
+	cout << termcolor::bold << "================================" << endl
+		 << termcolor::reset;
 }
