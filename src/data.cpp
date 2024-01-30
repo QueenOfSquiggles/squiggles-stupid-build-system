@@ -208,12 +208,12 @@ vector<Source> StupidBuild::get_files_recursive(string dir)
 			dir = global_path.substr(index + offset);
 		}
 
-		filesystem::path obj_path = filesystem::relative("build/obj");
+		filesystem::path obj_path = filesystem::relative("./build/obj");
 		obj_path.append(dir);
 		obj_path.append(f.stem().string() + ".o");
 		source.obj_path = obj_path;
 
-		filesystem::path log_path = filesystem::relative("build/log");
+		filesystem::path log_path = filesystem::relative("./build/log");
 		log_path.append(dir);
 		log_path.append(f.stem().string() + ".log.txt");
 		source.log_path = log_path;
@@ -224,8 +224,7 @@ vector<Source> StupidBuild::get_files_recursive(string dir)
 	}
 	return files;
 }
-void StupidBuild::collect_log_data(Source *source,
-								   std::filesystem::path log_file)
+void StupidBuild::collect_log_data(Source *source, std::filesystem::path log_file)
 {
 	// read file
 	ifstream reader(log_file);
@@ -235,53 +234,82 @@ void StupidBuild::collect_log_data(Source *source,
 		return;
 	}
 
-	string line;
+	string line = "";
 	int log_file_line = 0;
+	int line_num = 0;
+	int column = 0;
+	string msg_type = "";
+	bool handling_include_error = false;
 	while (getline(reader, line))
 	{
 		log_file_line++;
-		if (line.substr(0, 4).compare("src/") != 0 ||
-			line.find(":") == string::npos)
-		{
-			continue;
-		}
-		// source file
-		size_t idx = line.find(":");
-		line = line.substr(idx + 1);
-		// line number
-		idx = line.find(':');
-		if (idx > 8u || idx == string::npos)
-		{
-			continue;
-		}
-		// cout << "Error from " << file << ":" << log_file_line << endl;
-		// cout << "Line: <<" << line << ">>" << endl;
-		// cout << "File: " << source << endl;
-		// cout << "Line Number: '" << line.substr(0, idx) << "'" << endl;
-		int line_num = stoi(line.substr(0, idx));
-		line = line.substr(idx + 1);
+		if (!handling_include_error)
+		{ // handle typical source file-centric errors/warnings
+			if (line.substr(0, 4).compare("src/") != 0 ||
+				line.find(":") == string::npos)
+			{
+				continue;
+			}
+			// source file
+			size_t idx = line.find(":");
+			line = line.substr(idx + 1);
+			// line number
+			idx = line.find(':');
+			if (idx > 8u || idx == string::npos)
+			{
+				continue;
+			}
+			line_num = stoi(line.substr(0, idx));
+			line = line.substr(idx + 1);
 
-		// column number
-		idx = line.find(":");
-		// cout << "Line Column: '" << line.substr(0, idx) << "'" << endl;
-		int column = stoi(line.substr(0, idx));
-		line = line.substr(idx + 1);
+			// column number
+			idx = line.find(":");
+			column = stoi(line.substr(0, idx));
+			line = line.substr(idx + 1);
 
-		// message type
-		idx = line.find(":");
-		string msg_type = line.substr(1, idx - 1); // remove space
-		// cout << "Type: '" << msg_type << "'" << endl;
-		line = line.substr(idx + 1);
+			// message type
+			idx = line.find(":");
+			if (idx == string::npos)
+			{
+				// try find include error
+				idx = line.find_first_not_of(' ');
+				string check = line.substr(idx);
+				std::cout << "Checking \"" << check << "\" for include error key words" << std::endl;
+				if (check.compare("required from here") == 0)
+				{
+					handling_include_error = true;
+					continue;
+				}
+			}
+			string msg_type = line.substr(1, idx - 1); // remove space
+			line = line.substr(idx + 1);
+		}
+		else
+		{ // handle include related error
+			size_t idx;
+			for (int i = 0; i < 4; i++)
+			{ // clear include file paths
+				idx = line.find(":");
+				line = line.substr(idx + 1);
+			}
+			std::cout << "Handling include error: \"" << line << "\"" << std::endl;
+		}
 
 		// message
 		LineError err;
 		err.line = line_num;
 		err.column = column;
-		err.message = line + "\n[ " + log_file.string() + ":" + to_string(log_file_line) + " ]";
+		err.message = line + "\n[" + log_file.string() + ":" +
+					  to_string(log_file_line) + "]";
 		// cout << "Message: '" << line << "'" << endl
 		//  << endl;
-
-		if (msg_type.compare("error") == 0)
+		if (handling_include_error)
+		{
+			err.type = ErrorType::INCLUDE_ERROR;
+			source->errors.push_back(err);
+			handling_include_error = false;
+		}
+		else if (msg_type.compare("error") == 0)
 		{
 			err.type = ErrorType::ERROR;
 			source->errors.push_back(err);
@@ -289,6 +317,7 @@ void StupidBuild::collect_log_data(Source *source,
 		else if (msg_type.compare("note") == 0)
 		{
 			err.type = ErrorType::NOTE;
+			source->notes.push_back(err);
 		}
 		else
 		{
@@ -351,15 +380,19 @@ BuildResponse StupidBuild::build_target(string target)
 	// construct arguments chain
 	string args;
 
+	if (this->debug_mode)
+	{
+		args += " -g";
+	}
 	for (string incl : this->include_dirs)
 	{
-		args += " -I /$(pwd)/" + incl;
+		args += " -I ./" + incl;
 	}
 	// include source dir automatically
-	args += " -I /$(pwd)/src/";
+	args += " -I ./src/";
 	for (string dir : this->library_dirs)
 	{
-		args += " -L /$(pwd)/" + dir;
+		args += " -L ./" + dir;
 	}
 	for (string warning : this->warnings)
 	{
@@ -373,10 +406,6 @@ BuildResponse StupidBuild::build_target(string target)
 	{
 		args += " -std=" + this->standard;
 	}
-	if (this->debug_mode)
-	{
-		args += " -g";
-	}
 	if (this->optimize)
 	{
 		args += " -O2";
@@ -386,13 +415,19 @@ BuildResponse StupidBuild::build_target(string target)
 		args += this->extra_args;
 	}
 	string object_sources = "";
-	// build object files
+	int index = 0;
+	auto targets = std::vector<Source>();
 	for (Source s : this->source_files)
 	{
 		if (s.type == SourceType::H_SOURCE || s.type == SourceType::HPP_SOURCE)
 		{
 			continue;
 		}
+		targets.push_back(s);
+	}
+	// build object files
+	for (Source s : targets)
+	{
 		filesystem::create_directories(s.log_path.parent_path());
 		filesystem::create_directories(s.obj_path.parent_path());
 
@@ -402,10 +437,18 @@ BuildResponse StupidBuild::build_target(string target)
 		if (!this->incremental || has_source_changed(s))
 		{
 			char cmd[CMD_BUFFER_SIZE];
-			snprintf(cmd, CMD_BUFFER_SIZE, "%s -c %s %s -o %s &> %s", compiler.c_str(), args.c_str(),
+			snprintf(cmd, CMD_BUFFER_SIZE, "%s -c %s %s -o %s &> %s",
+					 compiler.c_str(), args.c_str(),
 					 rel_path.generic_string().c_str(), s.obj_path.c_str(),
 					 s.log_path.c_str());
+			std::cout << "[o " << (++index) << "/" << std::to_string(targets.size())
+					  << "]  " << cmd << std::endl;
 			system(cmd);
+		}
+		else
+		{
+			std::cout << "[o " << (++index) << "/" << std::to_string(targets.size())
+					  << "]  skipped (" << rel_path.string() << ")" << std::endl;
 		}
 		collect_log_data(&s, s.log_path);
 		resp.sources.push_back(s);
@@ -417,10 +460,12 @@ BuildResponse StupidBuild::build_target(string target)
 	bin_log.append(bin + ".log.txt");
 	// compile/link binary
 	char cmd[CMD_BUFFER_SIZE];
-	snprintf(cmd, CMD_BUFFER_SIZE,
-			 "%s -o ./build/%s %s %s &> ./build/%s", compiler.c_str(), bin.c_str(),
-			 args.c_str(), object_sources.c_str(), (bin + ".log.txt").c_str());
-	if (system(cmd) != 0)
+	snprintf(cmd, CMD_BUFFER_SIZE, "%s -o ./build/%s %s %s &> ./build/%s",
+			 compiler.c_str(), bin.c_str(), args.c_str(), object_sources.c_str(),
+			 (bin + ".log.txt").c_str());
+	int result = system(cmd);
+	std::cout << "[bin] " << cmd << std::endl;
+	if (result != 0)
 	{
 		cerr << "Failed to link binary. See " << bin_log.string()
 			 << " for more details" << endl;

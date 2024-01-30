@@ -86,6 +86,12 @@ void Display::display_build_information()
 			cerr << termcolor::yellow << termcolor::bold << "  [" << relative_path.string() << ":" << err.line << ":" << err.column << "] Warning: " << termcolor::reset << termcolor::yellow << msg << endl
 				 << termcolor::reset;
 		}
+		for (LineError err : source.notes)
+		{
+			string msg = split_long_message(err.message);
+			cerr << termcolor::blue << termcolor::bold << "  [" << relative_path.string() << ":" << err.line << ":" << err.column << "] Note: " << termcolor::reset << termcolor::blue << msg << endl
+				 << termcolor::reset;
+		}
 		if (!source.errors.empty() || !source.warnings.empty())
 		{
 			cout << endl

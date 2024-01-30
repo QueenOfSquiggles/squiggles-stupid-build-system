@@ -1,0 +1,13 @@
+In file included from /usr/include/glm/glm.hpp:105,
+                 from src/engine/window/../render_system/shaders/program.hpp:6,
+                 from src/engine/window/../render_system/renderable.hpp:2,
+                 from src/engine/window/../render_system/render.hpp:2,
+                 from src/engine/window/window.hpp:4,
+                 from src/engine/engine.hpp:5,
+                 from src/main.cpp:1:
+/usr/include/glm/detail/func_trigonometric.inl: In instantiation of ‘constexpr genType glm::radians(genType) [with genType = int]’:
+src/main.cpp:134:14:   required from here
+/usr/include/glm/detail/func_trigonometric.inl:11:17: error: static assertion failed: 'radians' only accept floating-point input
+   11 |                 GLM_STATIC_ASSERT(std::numeric_limits<genType>::is_iec559, "'radians' only accept floating-point input");
+      |                 ^~~~~~~~~~~~~~~~~
+/usr/include/glm/detail/func_trigonometric.inl:11:17: note: ‘std::numeric_limits<int>::is_iec559’ evaluates to false

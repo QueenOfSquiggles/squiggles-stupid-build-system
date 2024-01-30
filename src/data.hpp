@@ -15,11 +15,13 @@ enum SourceType
 	C_SOURCE,
 	H_SOURCE,
 };
+
 enum ErrorType
 {
 	NOTE,
 	WARNING,
-	ERROR
+	ERROR,
+	INCLUDE_ERROR
 };
 
 struct LineError
@@ -37,6 +39,7 @@ struct Source
 	std::filesystem::path log_path;
 	SourceType type;
 	std::vector<LineError> errors;
+	std::vector<LineError> notes;
 	std::vector<LineError> warnings;
 };
 
