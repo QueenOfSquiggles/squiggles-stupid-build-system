@@ -274,25 +274,34 @@ void StupidBuild::collect_log_data(Source *source, std::filesystem::path log_fil
 				// try find include error
 				idx = line.find_first_not_of(' ');
 				string check = line.substr(idx);
-				std::cout << "Checking \"" << check << "\" for include error key words" << std::endl;
+				// std::cout << "Checking \"" << check << "\" for include error key words" << std::endl;
 				if (check.compare("required from here") == 0)
 				{
 					handling_include_error = true;
 					continue;
 				}
 			}
-			string msg_type = line.substr(1, idx - 1); // remove space
+			msg_type = line.substr(1, idx - 1); // remove space
 			line = line.substr(idx + 1);
 		}
 		else
 		{ // handle include related error
 			size_t idx;
-			for (int i = 0; i < 4; i++)
+			for (int i = 0; i < 3; i++)
 			{ // clear include file paths
 				idx = line.find(":");
 				line = line.substr(idx + 1);
 			}
-			std::cout << "Handling include error: \"" << line << "\"" << std::endl;
+			idx = line.find(":");
+			msg_type = "note";
+			if (idx != string::npos)
+			{
+				msg_type = line.substr(1, idx - 1); // remove space
+				line = line.substr(idx + 1);
+			}
+
+			// std::cout << "Handling include error: \"" << line << "\"" << std::endl
+			// 		  << "\tType: \"" << msg_type << "\"" << std::endl;
 		}
 
 		// message
@@ -305,11 +314,11 @@ void StupidBuild::collect_log_data(Source *source, std::filesystem::path log_fil
 		//  << endl;
 		if (handling_include_error)
 		{
-			err.type = ErrorType::INCLUDE_ERROR;
-			source->errors.push_back(err);
+			// err.type = ErrorType::INCLUDE_ERROR;
+			// source->errors.push_back(err);
 			handling_include_error = false;
 		}
-		else if (msg_type.compare("error") == 0)
+		if (msg_type.compare("error") == 0)
 		{
 			err.type = ErrorType::ERROR;
 			source->errors.push_back(err);
