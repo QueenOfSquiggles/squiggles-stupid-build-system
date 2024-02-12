@@ -76,6 +76,7 @@ public:
 	std::vector<std::string> library_dirs;
 	std::vector<std::string> warnings;
 	std::vector<std::string> include_dirs;
+	std::vector<std::string> resource_dirs;
 	std::string extra_args;
 	std::string standard;
 	std::string current_dir;

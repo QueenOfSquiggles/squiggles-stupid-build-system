@@ -15,6 +15,27 @@ void CMakeGenerator::write_cmake(Config config)
 	// - https://cmake.org/cmake/help/latest/guide/tutorial/Adding%20a%20Library.html
 	// - https://www.baeldung.com/linux/cmake-cross-platform-compilation
 
+	// collect resource files
+	std::vector<std::filesystem::path> resource_files;
+	for (auto res_dir : config.resource_dirs)
+	{
+		auto dir = std::filesystem::recursive_directory_iterator(res_dir);
+		for (auto entry : dir)
+		{
+			if (!entry.is_directory())
+			{
+				if (entry.path().string().find(' ') != std::string::npos)
+				{
+					std::cerr << "Unsupported resource file! : " << entry.path() << " (Cannot contain spaces!!!)" << std::endl;
+				}
+				else
+				{
+					resource_files.push_back(entry.path());
+				}
+			}
+		}
+	}
+
 	auto file_path = std::filesystem::current_path();
 	file_path.append("CMakeLists.txt");
 	std::ofstream file(file_path);
@@ -29,6 +50,17 @@ void CMakeGenerator::write_cmake(Config config)
 		 << std::endl
 		 << "cmake_minimum_required (VERSION 3.22.1)"
 		 << std::endl;
+	// CXX Standard
+	if (!config.standard.empty())
+	{
+		file << "set(CMAKE_CXX_STANDARD " << config.standard << ")" << std::endl
+			 << "# Fix behavior of CMAKE_CXX_STANDARD when targeting macOS. (source: https://stackoverflow.com/a/31010221 )" << std::endl
+			 << "if (POLICY CMP0025)" << std::endl
+			 << "\tcmake_policy(SET CMP0025 NEW)" << std::endl
+			 << "endif()" << std::endl
+			 << std::endl;
+	}
+
 	// project specification
 	auto bin = config.bin;
 	auto project = bin;
@@ -42,36 +74,82 @@ void CMakeGenerator::write_cmake(Config config)
 	// executable
 	file
 		<< "# Executable" << std::endl
-		<< "add_executable(" << bin;
+		<< "add_executable(" << bin << std::endl;
 	for (auto source : config.source_files)
 	{
 		if (source.type == SourceType::C_SOURCE || source.type == SourceType::CPP_SOURCE)
 		{
 			auto rel_path = std::filesystem::relative(source.filepath);
-			file << " " << rel_path.string();
+			file << "\t" << rel_path.string() << std::endl;
 		}
 	}
-
+	for (auto resource : resource_files)
+	{
+		auto rel_path = std::filesystem::relative(resource);
+		file << "\t" << rel_path << std::endl;
+	}
 	file << ")" << std::endl
 		 << std::endl
 		 << std::endl;
 
 	// includes
-	file << "# Includes" << std::endl;
-	for (auto incl : config.include_dirs)
+	if (!config.include_dirs.empty())
 	{
-		file << "target_include_directories(" << config.bin << " PUBLIC " << incl << ")" << std::endl;
+		file << "# Includes" << std::endl;
+		file << "target_include_directories(" << config.bin << " PUBLIC " << std::endl;
+		for (auto incl : config.include_dirs)
+		{
+			file << "\t" << incl << std::endl;
+		}
+		file << ")" << std::endl;
 	}
 
 	// libraries
-	file << "# Libraries" << std::endl;
-	for (auto lib : config.libraries)
+	if (!config.libraries.empty())
 	{
-		file << "target_link_libraries(" << config.bin << " " << lib.name << ")" << std::endl;
+
+		file << "# Libraries" << std::endl
+			 << "target_link_libraries(" << config.bin << std::endl;
+		for (auto lib : config.libraries)
+		{
+			file << "\t" << lib.name << std::endl;
+		}
+		file << ")" << std::endl;
+	}
+
+	// resource dirs
+	if (!resource_files.empty())
+	{
+		file << "# Resource files" << std::endl;
+		for (auto res : resource_files)
+		{
+			file << "file(COPY_FILE " << res << " "
+				 << "${PROJECT_BINARY_DIR}/" << res << " ONLY_IF_DIFFERENT)" << std::endl;
+		}
+
+		file << "set(RESOURCE_FILES" << std::endl;
+		for (auto res : resource_files)
+		{
+			file << "\t" << res << std::endl;
+		}
+		file << ")" << std::endl;
+
+		file << "set_target_properties(" << config.bin << " PROPERTIES" << std::endl
+			 << "\tMACOSX_BUNDLE TRUE" << std::endl
+			 << "\tMAXOSX_FRAMEWORK_IDENTIFIER org.ssbsgen." << config.bin << std::endl
+			 << "\tRESOURCE \"${RESOURCE_FILES}\"" << std::endl
+			 << ")" << std::endl;
 	}
 
 	// install option
 	file << "# Installation" << std::endl
-		 << "install(TARGETS " << bin << ")";
+		 << "install(TARGETS " << bin;
+	if (!resource_files.empty())
+	{
+		file << std::endl
+			 << "\tRESOURCE \"${RESOURCE_FILES}\"" << std::endl;
+	}
+	file << ")" << std::endl
+		 << std::endl;
 	file.close();
 }

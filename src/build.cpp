@@ -38,7 +38,7 @@ BuildResponse StupidBuild::build_target(string target)
 	}
 	if (!config.standard.empty())
 	{
-		args += " -std=" + config.standard;
+		args += " -std=c++" + config.standard;
 	}
 	if (config.optimize)
 	{

@@ -43,10 +43,15 @@ void parse_configs(Config &config)
 {
 	// defaults
 	config.bin = "main";
-	config.include_dirs.push_back("./src/");
+	config.include_dirs.push_back("src/");
 	if (auto s = config.config.find("std"); s != config.config.end())
 	{
-		config.standard = s->second;
+		auto std = s->second;
+		if (std.substr(0, 3).compare("c++") == 0)
+		{
+			std = std.substr(3);
+		}
+		config.standard = std;
 	}
 	if (auto s = config.config.find("extra"); s != config.config.end())
 	{
@@ -121,6 +126,18 @@ void parse_configs(Config &config)
 				continue;
 			}
 			config.library_dirs.push_back(t);
+		}
+	}
+	if (auto s = config.config.find("resources"); s != config.config.end())
+	{
+		auto tokens = tokenize(s->second, config);
+		for (string t : tokens)
+		{
+			if (t[0] == '[' || t[0] == ']')
+			{
+				continue;
+			}
+			config.resource_dirs.push_back(t);
 		}
 	}
 }
