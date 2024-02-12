@@ -1,12 +1,21 @@
 #pragma once
-
-#include <vector>
 #include <string>
-#include <unordered_map>
+#include <vector>
+#include <map>
 #include <filesystem>
+#include <fstream>
+#include <iostream>
 
 #define DEFAULT_TARGET_CONFIG "ssbs"
-#define CMD_BUFFER_SIZE 4096
+
+struct Source;
+struct BuildResponse
+{
+	bool succeeded;
+	std::vector<Source> sources;
+	int errors;
+	int warnings;
+};
 
 enum SourceType
 {
@@ -34,10 +43,10 @@ struct LineError
 
 struct Source
 {
+	SourceType type;
 	std::filesystem::path filepath;
 	std::filesystem::path obj_path;
 	std::filesystem::path log_path;
-	SourceType type;
 	std::vector<LineError> errors;
 	std::vector<LineError> notes;
 	std::vector<LineError> warnings;
@@ -55,21 +64,13 @@ struct Library
 	LinkMode link;
 };
 
-// This is a great resource for various techniques available in g++:
-//		https://bytes.usc.edu/cs104/wiki/gcc/
-
-struct BuildResponse
+class Config
 {
-	bool succeeded;
-	std::vector<Source> sources;
-	int errors;
-	int warnings;
-};
 
-class StupidBuild
-{
-private:
-	std::unordered_map<std::string, std::string> config;
+public:
+	Config();
+	Config(std::string target_config);
+	std::map<std::string, std::string> config;
 	std::vector<Source> source_files;
 	std::vector<Library> libraries;
 	std::vector<std::string> library_dirs;
@@ -79,18 +80,11 @@ private:
 	std::string standard;
 	std::string current_dir;
 	std::string compiler;
+	std::string bin;
 	bool debug_mode = false;
 	bool optimize = true;
 	bool incremental = true;
 
 	bool has_source_changed(Source source);
-	bool load_config(std::string filepath);
-	void parse_configs();
 	void collect_log_data(Source *source, std::filesystem::path log_file);
-	bool init();
-	std::vector<Source> get_files_recursive(std::string dir);
-
-public:
-	bool open_path(std::string directory);
-	BuildResponse build_target(std::string target);
 };
